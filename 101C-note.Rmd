@@ -1,0 +1,367 @@
+---
+title: "101C_knn"
+author: "Vera Mak"
+date: "9/30/2021"
+output: pdf_document
+---
+
+```{r banknote week1 KNN}
+library(ggplot2)
+library(mclust)
+data(banknote)
+banknote
+set.seed(123) 
+i=1:dim(banknote)[1] #  数列： 1:200   200rows 7col
+i.train=sample(i,130, replace=F) 
+# 130 ramdom number in 1:200
+
+
+# p = ggplot(bn.train,aes(x=banknote$Top,fill=factor(Y)))
+# p+geom_boxplot()
+
+# eliminate status as response variable  and eliminate the Diagonal variable 
+# note: knn() need a matirx without response variable 
+bn.train=banknote[i.train,-c(1,7)]  # 130 training data
+bn.test=banknote[-i.train, -c(1,7)] # 70 training data
+
+Y = rep(0,200)
+Y[which(banknote$Status == "counterfeit")] = 1 
+# add Y col as 1 = counterfeit 0 = true
+banknote = cbind(banknote,Y)
+counterfeit.train <- banknote[i.train,]$Y 
+counterfeit.test <- banknote[-i.train,]$Y
+
+knn(bn.train, bn.test, counterfeit.train, k = 1) table(counterfeit.test,m.knn)
+# p = ggplot(banknote.tain)
+# # new_banknote= banknote[-7]
+# # set.seed(100)
+# # train_data = new_banknote[sample(nrow(new_banknote),130,replace = F)]
+# # test_data =  new_banknote[sample(nrow(new_banknote),70,replace = F)]
+# # 
+# # library(class)
+# # 
+# # ?knn()
+# # knn(train_data,test_data)
+
+
+```
+
+ Logistic Regression (classification )
+```{r banknote sample-code week2 LR}
+# EX. identify the counterfeit banknotes 
+# predictors d: length left right top bottom diagonal 
+# response :  Y=1=conterfeit  Y=0= henuine 
+library(mclust)
+# Load the data set. 
+data(banknote) 
+banknote$Status <- factor(banknote$Status, levels=c("genuine", "counterfeit")) 
+banknote$Status
+# Split into training and test data. 
+set.seed(123) 
+# Set seed to reproduce results. 
+i <- 1:dim(banknote)[1]
+# Generate a random sample. 
+i.train <- sample(i, 130, replace = F) 
+bn.train <- banknote[i.train,] 
+bn.test <- banknote[-i.train,]
+# Fit a logistic regression model (using predictors : length right lefy top )
+ml <- glm(Status~Length+Right+Left+Top, data=bn.train,family="binomial") 
+summary(ml)
+# predicted probabilities of "success"
+# use the predicted probabilities for classification
+probs <- predict(ml, bn.test[,-1], type = "response")  
+# bn.test[,-1] : make use of test set    
+my.thres <- 0.5  # threshold = 0.5 for classification 
+predicted.counterfeit <- probs > my.thres # Confusion matrix.
+# confusion table 
+table(bn.test[,1] == 'counterfeit', predicted.counterfeit)
+
+# test error rate
+8/70
+
+# pred.log.odds <- predict(ml)
+# pred.probs <- predict(ml, type = "response")
+
+ml2 <- glm(Status~Length+Right+Left+Top+Bottom, data=bn.train,family="binomial")
+summary(ml2)
+probs2 <- predict(ml2, bn.test[,-1], type = "response")  
+# bn.test[,-1] : make use of test set    
+my.thres <- 0.5  # 
+predicted.counterfeit2 <- probs2 > my.thres # Confusion matrix. 
+table(bn.test[,1] == 'counterfeit', predicted.counterfeit2)
+
+
+```
+
+Discriminant Analysis
+Make some assumptions about the probability
+distributions P(Y) and P(X|Y = y) and use them to
+compute P(Y | X = x).
+
+```{r LDA QDA} 
+library(mclust)
+# Load the data set. 
+data(banknote) 
+banknote$Status<-factor(banknote$Status, levels=c("genuine", "counterfeit"))
+# Split into training and test data. 
+set.seed(123) 
+# Set seed to reproduce results. 
+i <- 1:dim(banknote)[1] # Generate a random sample. 
+i.train <- sample(i, 130, replace = F)
+bn.train <- banknote[i.train,] 
+bn.test <- banknote[-i.train,]
+
+library(MASS) 
+```
+
+### LDA VS PCA(principle component analysis主成分析)###
+*相同点： 
+两者均可以对数据完成降维操作
+两者在降维时候均使用矩阵分解的思想
+两者都假设数据符合高斯分布
+
+*不同点：
+LDA是监督降维算法，PCA是无监督降维算法
+LDA降维最多降到类别数目k-1的维数，而PCA没有限制
+LDA除了降维外，还可以应用于分类
+LDA选择的是分类性能最好的投影，而PCA选择样本点投影具有最大方差的方向
+ 
+
+
+
+#### LDA ### Linear Discriminant Analysis 线性判别分析
+assumes that the classes have a common covariance matrix. In other words, that Σ=Σ0=Σ1
+线性判断分析(LDA)：LDA是一种基于分类模型进行特征属性合并的操作，是一 种有监督的降维方法。
+ LDA的原理是，将带上标签的数据（点，通过投影的方法，投影到维度更低的空间中，使得投影后的点，会形成按类别区分，一簇一簇的情况，相同类别的点，将会在投影后的空间中更接近。用一句话概括就是：“投影后类内方差最小，类间方差最大”
+
+
+```{r}
+lda.mod <- lda(Status~Length + Right + Left + Top, data = bn.train) 
+lda.mod #I chose these two variables arbitrarily
+
+pred.lda.test <- predict(lda.mod, bn.test[,-1])
+pred.lda.test$posterior[1:10,] 
+pred.lda.test$class[1:10] 
+# Confusion matrix 
+###  (1)using pred.lda.test$class 
+table('Reference' = bn.test[,1] == 'counterfeit', "Predicted" =pred.lda.test$class)
+
+###  or (2) Set the standard threshold 
+# my.thres <- 0.5 
+# predicted.counterfeit.lda <- pred.lda.test$posterior[,’counterfeit’]>my.thres
+# 
+# table('Reference' = bn.test[,1] == 'counterfeit', "Predicted" = predicted.counterfeit.lda)
+
+#Test Error Rate = 7/70 = 0.1
+```
+
+### QDA ### Quadratic Discriminant Analysis 二次判别分析 
+QDA是LDA的变体，其中针对每类观察估计单个协方差矩阵。如果事先知道个别类别表现出不同的协方差，则QDA特别有用。QDA的缺点是它不能用作降维技术。 QDA的每个类别都可以拥有自己的协方差矩阵。当决策边界为非线性时，QDA通常会表现更好。
+we have a covariance matrix for class 0 and another Σ1 for class1
+
+```{r}
+qda.mod <- qda(Status~Length + Right + Left + Top, data = bn.train)
+qda.mod
+# Evaluate the classification performance of QDA 
+pred.qda.test <- predict(qda.mod, bn.test[,-1])
+# Confusion matrix 
+table('Reference' = bn.test[,1] == 'counterfeit', "Predicted" = pred.qda.test$class)
+
+
+```
+
+
+
+
+##The Validation Set Approach##
+我们可以把整个数据集分成两部分，一部分用于训练，一部分用于验证，这也就是我们经常提到的训练集（training set）和测试集（test set）。
+弊端： 
+1.最终模型与参数的选取将极大程度依赖于你对训练集和测试集的划分方法
+在不同的划分方法下，testMSE的变动是很大的，而且对应的最优degree也不一样。所以如果我们的训练集和测试集的划分方法不够好，很有可能无法选择到最好的模型与参数。
+2.只用了部分数据进行模型的训练
+所以训练集和测试集的划分意味着我们无法充分利用我们手头已有的数据，所以得到的模型效果也会受到一定的影响。
+
+#### Cross validation ###
+前提： 通常来说我们不能将全部用于数据训练模型，否则我们将没有数据集对该模型进行验证，从而评估我们的模型的预测效果。
+
+one way to estimate the test error rate 
+交叉验证是在机器学习建立模型和验证模型参数时常用的办法。 交叉验证，顾名思义，就是重复的使用数据，把得到的样本数据进行切分，组合为不同的训练集和测试集，用训练集来训练模型，用测试集来评估模型预测的好坏
+1. LOOCV
+2. K-fold cross validation
+
+
+
+
+EX. **validation set approach** to determine the best polynomial(degree of 1,2,...,10) for predicting mileage from horsepower 
+apply the model to predict the outcomes for the validation data -> construct the validation MSE
+
+
+
+
+$$MSE = \frac{\sum_{i}^n(\hat{y}-y_i)^2}{n}$$
+
+```{r}
+library(ISLR) 
+attach(Auto) 
+n <- nrow(Auto) # Number of observations.
+n_train <- round(n/2) # Number of observations for training 
+n_val <- n - n_train 
+i.train <- sample(1:n, n_train) # Generate a random sample.
+auto.train <- Auto[i.train,] 
+auto.validation <- Auto[-i.train,]
+lm <- lm(mpg~horsepower,data=auto.train)
+predictions <- predict(lm,newdata=auto.validation) 
+MSE1<-sum((auto.validation$mpg - predictions)^2)/n_val
+MSE1
+
+
+# degree = 2
+lm2<-lm(mpg~poly(horsepower,2),data=auto.train)
+predictions=predict(lm2,newdata=auto.validation) 
+MSE2=sum((auto.validation$mpg-predictions)^2)/n_val 
+MSE2 
+
+
+
+```
+## LOOCV ## Leave-one-out cross-validation
+像Test set approach一样，LOOCV方法也包含将数据集分为训练集和测试集这一步骤。但是不同的是，我们现在只用一个数据作为测试集，其他的数据都作为训练集，并将此步骤重复N次（N为数据集的数据数量）。
+每次取出一个数据作为测试集的唯一元素，而其他n-1个数据都作为训练集用于训练模型和调参。结果就是我们最终训练了n个模型，每次都能得到一个MSE。而计算最终test MSE则就是将这n个MSE取平均。
+
+优点： 不受测试集合训练集划分方法的影响，因为每一个数据都单独的做过测试集。同时，其用了n-1个数据训练模型，也几乎用到了所有的数据，保证了模型的bias更小。不过LOOCV的缺点也很明显，那就是计算量过于大，是test set approach耗时的n-1倍。
+
+
+
+
+## K-fold cross validation ##k折交叉验证
+我们每次的测试集将不再只包含一个数据，而是多个，具体数目将根据K的选取决定。比如，如果K=5，那么我们利用五折交叉验证的步骤就是：
+
+1.将所有数据集分成5份
+
+2.不重复地每次取其中一份做测试集，用其他四份做训练集训练模型，之后计算该模型在测试集上的[公式]
+
+3.将5次的[公式]取平均得到最后的MSE
+
+$$ CV_{(k)} = \frac{1}{k} \sum_{1=1}^kMSE_i $$
+
+
+【LOOCV是一种特殊的K-fold Cross Validation（K=N）】
+
+
+
+
+```{r LOOCV-Leave-one-out cross-validation}
+library(ISLR) 
+data(Auto) 
+n=nrow(Auto) # number of the observations 
+
+############################################# 
+######              Method 1           ######
+######            lm models            ######
+############################################# 
+# degree from 1 to 10
+MSEval.vec <- rep(0, 10) # To save the results. 10 differents models
+for (deg in 1:10){ 
+  #(deg is the degree of the polynomial.)
+  MSE.i <- rep(0, n)   
+  for (obs in 1:n){     
+    ml <- lm(mpg ~ poly(horsepower, deg), # predict mpg from horsepower   
+             data = Auto[-obs,]) 
+    # fit linear model using lm() based on n-1 data point
+    pred.i <- predict(ml, newdata = Auto[obs,])
+    # predict the remaining one point in the validation set using predict()
+    MSE.i[obs] <- (Auto[obs,]$mpg - pred.i)^2  }#compute the validation MSE
+  MSEval.vec[deg] <- mean(MSE.i) # fold-based error
+}
+
+plot(1:10,MSEval.vec, xlab = "Degree of Polynomial",ylim=c(16,28),type = 'l')
+points(1:10, MSEval.vec, pch = 20, cex = 2, col = 'blue')
+
+```
+
+```{r  cv.glm}
+############################################# 
+######              Method 2           ###### 
+######   using cv.glm for glm models   ###### ############################################# 
+library(boot) 
+kfold.MSEval.vec <- rep(0, 10) 
+for(deg in 1:10){   
+  glm.fit <- glm(mpg ~ poly(horsepower, deg),              family='gaussian',data = Auto)
+# (glm defaults to family=”gaussian”, which is equivalent to the lm() command)
+  kfold.MSEval.vec[deg]<-cv.glm(Auto,glm.fit,K = n)$delta[1] }
+# (cv.glm produces two estimates of the mse, but we will use only the first.)
+plot(1:10,kfold.MSEval.vec, xlab = "Degree of Polynomial",ylim=c(16,28),type = 'l') 
+points(1:10, kfold.MSEval.vec, pch = 20, cex = 2, col = 'blue')
+
+
+
+```
+
+```{r K-fold CV }
+#### choose k=10 
+kfold.MSEval.vec <- rep(0, 10) 
+for(deg in 1:10){   
+  glm.fit <- glm(mpg ~ poly(horsepower, deg), data = Auto)         
+  kfold.MSEval.vec[deg]<-cv.glm(Auto,glm.fit,K = 10)$delta[1] 
+  }
+plot(1:10,kfold.MSEval.vec, xlab = "Degree of Polynomial",type = 'l')
+points(1:10, kfold.MSEval.vec, pch = 20, cex = 2, col = 'blue')
+
+```
+
+
+```{r spliting the data}
+set.seed(45) 
+kfold <- 10 
+n <- nrow(data) ## total number of data points
+i.k<-sample(rep(1:kfold, length.out = n), n, replace=FALSE)
+## For a given value of i: ## i means the i-th fold that is used as the validation data
+j=3    ## j can be any value from 1 to k fold 
+i.test <- which(i.k==j) 
+train.frame <- mydata[-i.test,] 
+test.frame <- mydata[i.test,]
+
+
+
+```
+
+
+
+
+
+
+
+### week4 subset selection####
+
+```{r}
+# question: identify the variables that affect the response Salary
+# The regsubsets() function provides a general interface for best subset, forward and backward selection.
+
+library(ISLR)
+attach(Hitters)
+library(leaps)
+dim(Hitters)
+# response value : salary
+
+## best selection
+best_subset <- regsubsets(Salary~., data = Hitters, nbest = 1, nvmax = 19, intercept = TRUE, method = "exhaustive",really.big = FALSE)
+sumBS <- summary(best_subset)
+sumBS
+
+## forward selection
+forward_sel <- regsubsets(Salary~., data = Hitters, nbest = 1, nvmax = 19, intercept = TRUE, method = "forward", really.big = FALSE)
+sumF <- summary(forward_sel)
+
+## backward selection
+backward_sel <- regsubsets(Salary~., data = Hitters, nbest = 1, nvmax = 19, intercept = TRUE, method = "backward", really.big = FALSE)
+sumB <- summary(backward_sel)
+
+
+```
+
+
+
+
+
+
+
